@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shehbaz Developer AI</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.3/dist/tailwind.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="main.css" />
+</head>
+<style>
+  body {
+    background-color: #111827;
+    color: #f3f4f6;
+    font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: #1f2937; }
+::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+
+/* Message Animation */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.message-animation {
+    animation: fadeIn 0.3s ease-out forwards;
+}
+</style>
+<body class="bg-gray-900 text-gray-100 font-sans flex flex-col min-h-screen">
+
+  <div class="bg-gray-800 border-b border-gray-700 py-4 shadow-md fixed w-full z-10 top-0">
+    <h1 class="text-center text-xl font-bold text-blue-400 tracking-wider">
+      SHEHBAZ <span class="text-white">DEVELOPER BOT</span>
+    </h1>
+  </div>
+
+  <div class="flex-grow container mx-auto pt-20 pb-24 px-4 sm:px-6 max-w-3xl">
+    <div class="h-full w-full">
+      <div id="chatbox" class="flex flex-col space-y-4"></div>
+    </div>
+  </div>
+
+  <div class="fixed bottom-0 w-full bg-gray-800 border-t border-gray-700 p-4">
+    <div class="max-w-3xl mx-auto flex flex-col sm:flex-row gap-2">
+      <input
+        class="flex-grow bg-gray-700 text-white placeholder-gray-400 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow shadow-inner"
+        id="messageInput"
+        type="text"
+        placeholder="Type your message..."
+      />
+      <div class="flex space-x-2">
+        <button class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors shadow-md w-24" id="clearButton">Clear</button>
+        <button class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg transition-colors shadow-md w-full sm:w-auto" id="sendButton">Send</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const chatbox = document.getElementById("chatbox");
+    const messageInput = document.getElementById("messageInput");
+    const sendButton = document.getElementById("sendButton");
+    const clearButton = document.getElementById("clearButton");
+    const chatId = crypto.randomUUID();
+    let websocket = null;
+    let receiving = false;
+    const systemPrompt = "You are Shehbaz, an expert software developer and helpful AI assistant.";
+
+    function createMessageElement(text, alignment) {
+      const wrapper = document.createElement("div");
+      wrapper.className = `flex ${alignment === "left" ? "justify-start" : "justify-end"} message-animation`;
+      const messageBubble = document.createElement("div");
+      messageBubble.className = `max-w-3/4 px-5 py-3 rounded-2xl shadow-md text-sm sm:text-base leading-relaxed ${alignment === "left" ? "bg-gray-700 text-gray-100 rounded-tl-none" : "bg-blue-600 text-white rounded-tr-none"}`;
+      messageBubble.textContent = text;
+      wrapper.appendChild(messageBubble);
+      return { wrapper, messageBubble };
+    }
+
+    function connectWebSocket(message, initChat) {
+      receiving = true;
+      sendButton.textContent = "Stop";
+      sendButton.classList.replace("bg-blue-600", "bg-orange-500");
+      sendButton.classList.replace("hover:bg-blue-700", "hover:bg-orange-600");
+      const url = "wss://backend.buildpicoapps.com/api/chatbot/chat";
+      websocket = new WebSocket(url);
+      websocket.addEventListener("open", () => {
+        websocket.send(JSON.stringify({ chatId: chatId, appId: "ahead-less", systemPrompt: systemPrompt, message: initChat ? "Short welcome msg" : message }));
+      });
+      const { wrapper, messageBubble } = createMessageElement("...", "left");
+      chatbox.appendChild(wrapper);
+      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+      let firstChunk = true;
+      websocket.onmessage = (event) => {
+        if(firstChunk) { messageBubble.textContent = ""; firstChunk = false; }
+        messageBubble.textContent += event.data;
+        window.scrollTo({ top: document.body.scrollHeight, behavior: 'auto' });
+      };
+      websocket.onclose = (event) => {
+        receiving = false;
+        resetButton();
+        if (event.code !== 1000) messageBubble.textContent += " [Connection Error]";
+      };
+    }
+
+    function resetButton() {
+        sendButton.textContent = "Send";
+        sendButton.classList.replace("bg-orange-500", "bg-blue-600");
+        sendButton.classList.replace("hover:bg-orange-600", "hover:bg-blue-700");
+    }
+
+    sendButton.addEventListener("click", () => {
+      if (!receiving && messageInput.value.trim() !== "") {
+        const messageText = messageInput.value.trim();
+        messageInput.value = "";
+        const { wrapper } = createMessageElement(messageText, "right");
+        chatbox.appendChild(wrapper);
+        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+        connectWebSocket(messageText, false);
+      } else if (receiving && websocket) {
+        websocket.close(1000);
+        receiving = false;
+        resetButton();
+      }
+    });
+
+    messageInput.addEventListener("keydown", (e) => { if (e.key === "Enter" && !receiving && messageInput.value.trim() !== "") { e.preventDefault(); sendButton.click(); } });
+    clearButton.addEventListener("click", () => { chatbox.innerHTML = ""; connectWebSocket("", true); });
+    connectWebSocket("", true);
+  </script>
+</body>
+</html>
